@@ -1,27 +1,17 @@
-// src/frontend/background.ts
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.type === "GMAIL_COMPOSE_STATE") {
+    if (msg.inCompose) {
+      console.log("✉️ Gmail compose detected.");
 
-chrome.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
-  if (changeInfo.status !== "complete" || !tab.url) return;
-
-  const url = tab.url;
-
-  if (url.includes("mail.google.com")) {
-    if (url.includes("compose=")) {
-      console.log("[AC BG] Gmail Compose detected:", url);
-    } else if (url.includes("#inbox")) {
-      console.log("[AC BG] Gmail Inbox detected:", url);
+      if (msg.activeField === "body") {
+        console.log("🟢 User is typing in BODY.");
+      } else if (msg.activeField === "to") {
+        console.log("🟡 User is editing TO field.");
+      } else if (msg.activeField === "subject") {
+        console.log("🔵 User is editing SUBJECT.");
+      }
     } else {
-      console.log("[AC BG] Gmail (other view):", url);
-    }
-  }
-
-  if (url.includes("docs.google.com")) {
-    if (url.includes("/document/d/")) {
-      console.log("[AC BG] Google Docs Document detected:", url);
-    } else if (url.includes("/document/")) {
-      console.log("[AC BG] Google Docs Home detected:", url);
-    } else {
-      console.log("[AC BG] Google Docs (other view):", url);
+      console.log("❌ Not inside Gmail compose.");
     }
   }
 });
