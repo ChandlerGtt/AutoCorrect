@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Auto Correct Chrome Extension",
+  "version": "1.0.0",
+  "description": "AI powered Auto Correct Tool",
+
+  "action": {
+    "default_popup": "index.html"
+  },
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "permissions": ["tabs", "storage", "scripting"],
+
+  "host_permissions": [
+    "https://mail.google.com/*",
+    "https://docs.google.com/*"
+  ],
+
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/*", "https://docs.google.com/*"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
