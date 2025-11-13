@@ -5,6 +5,7 @@ export type GmailFieldType = "to" | "subject" | "body" | "none";
 export interface GmailDetectionState {
   inCompose: boolean;
   activeField: GmailFieldType;
+  bodyText: string;
   elements: {
     to: HTMLElement | null;
     subject: HTMLElement | null;
@@ -14,6 +15,7 @@ export interface GmailDetectionState {
 
 export class GmailComposeDetector {
   private observer: MutationObserver | null = null;
+  private inputListener: ((e: Event) => void) | null = null;
   private lastState: GmailDetectionState | null = null;
 
   constructor(private callback: (state: GmailDetectionState) => void) {}
@@ -27,8 +29,7 @@ export class GmailComposeDetector {
     this.observer = new MutationObserver(() => this.evaluate());
     this.observer.observe(document.body, config);
 
-    // Initial evaluation
-    this.evaluate();
+    this.evaluate(); // initial detection
   }
 
   private evaluate(): void {
@@ -50,17 +51,27 @@ export class GmailComposeDetector {
     const inCompose =
       toField !== null || subjectField !== null || bodyField !== null;
 
-    // Find active field
+    // Determine active field
     let active: GmailFieldType = "none";
-    const activeElement = document.activeElement;
+    const activeElem = document.activeElement;
 
-    if (activeElement === toField) active = "to";
-    else if (activeElement === subjectField) active = "subject";
-    else if (activeElement === bodyField) active = "body";
+    if (activeElem === toField) active = "to";
+    else if (activeElem === subjectField) active = "subject";
+    else if (activeElem === bodyField) active = "body";
+
+    // Capture body text
+    const bodyText: string =
+      bodyField instanceof HTMLElement ? bodyField.innerText ?? "" : "";
+
+    // Attach input listener only once per new body field
+    if (bodyField) {
+      this.attachBodyListener(bodyField);
+    }
 
     const newState: GmailDetectionState = {
       inCompose,
       activeField: active,
+      bodyText,
       elements: {
         to: toField,
         subject: subjectField,
@@ -68,11 +79,21 @@ export class GmailComposeDetector {
       },
     };
 
-    // Only fire callback if state changed
     if (!this.statesEqual(this.lastState, newState)) {
       this.lastState = newState;
       this.callback(newState);
     }
+  }
+
+  private attachBodyListener(bodyElement: HTMLElement): void {
+    // If listener already added → skip
+    if (this.inputListener) return;
+
+    this.inputListener = () => {
+      this.evaluate(); // re-run detection on input
+    };
+
+    bodyElement.addEventListener("input", this.inputListener);
   }
 
   private statesEqual(
@@ -83,6 +104,7 @@ export class GmailComposeDetector {
     return (
       a.inCompose === b.inCompose &&
       a.activeField === b.activeField &&
+      a.bodyText === b.bodyText &&
       a.elements.to === b.elements.to &&
       a.elements.subject === b.elements.subject &&
       a.elements.body === b.elements.body

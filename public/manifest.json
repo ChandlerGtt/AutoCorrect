@@ -4,9 +4,7 @@
   "version": "1.0.0",
   "description": "AI powered Auto Correct Tool",
 
-  "action": {
-    "default_popup": "index.html"
-  },
+  "action": { "default_popup": "index.html" },
 
   "background": {
     "service_worker": "background.js",
@@ -15,10 +13,7 @@
 
   "permissions": ["tabs", "storage", "scripting", "activeTab"],
 
-  "host_permissions": [
-    "https://mail.google.com/*",
-    "https://docs.google.com/*"
-  ],
+  "host_permissions": ["https://mail.google.com/*"],
 
   "content_scripts": [
     {
