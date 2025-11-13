@@ -1,11 +1,10 @@
-// src/frontend/gmail-detector.ts
-
 export type GmailFieldType = "to" | "subject" | "body" | "none";
 
 export interface GmailDetectionState {
   inCompose: boolean;
   activeField: GmailFieldType;
   bodyText: string;
+  caretText: string;
   elements: {
     to: HTMLElement | null;
     subject: HTMLElement | null;
@@ -16,27 +15,27 @@ export interface GmailDetectionState {
 export class GmailComposeDetector {
   private observer: MutationObserver | null = null;
   private inputListener: ((e: Event) => void) | null = null;
+  private keyListener: ((e: KeyboardEvent) => void) | null = null;
   private lastState: GmailDetectionState | null = null;
 
-  constructor(private callback: (state: GmailDetectionState) => void) {}
+  constructor(
+    private callback: (state: GmailDetectionState) => void,
+    private onKeyEvent: (key: string) => void
+  ) {}
 
   public start(): void {
-    const config: MutationObserverInit = {
-      childList: true,
-      subtree: true,
-    };
-
     this.observer = new MutationObserver(() => this.evaluate());
-    this.observer.observe(document.body, config);
-
-    this.evaluate(); // initial detection
+    this.observer.observe(document.body, { childList: true, subtree: true });
+    this.evaluate();
   }
 
   private evaluate(): void {
     const toSelector =
       'input[name="to"], textarea[name="to"], div[aria-label="To"]';
+
     const subjectSelector =
       'input[name="subjectbox"], input[aria-label="Subject"]';
+
     const bodySelector =
       'div[aria-label="Message Body"][contenteditable="true"][g_editable="true"]';
 
@@ -48,10 +47,8 @@ export class GmailComposeDetector {
       bodySelector
     ) as HTMLElement | null;
 
-    const inCompose =
-      toField !== null || subjectField !== null || bodyField !== null;
+    const inCompose = Boolean(toField || subjectField || bodyField);
 
-    // Determine active field
     let active: GmailFieldType = "none";
     const activeElem = document.activeElement;
 
@@ -59,19 +56,21 @@ export class GmailComposeDetector {
     else if (activeElem === subjectField) active = "subject";
     else if (activeElem === bodyField) active = "body";
 
-    // Capture body text
-    const bodyText: string =
+    const bodyText =
       bodyField instanceof HTMLElement ? bodyField.innerText ?? "" : "";
 
-    // Attach input listener only once per new body field
+    // Track caret word for popup window
+    const caretText = this.getCaretWord(bodyField);
+
     if (bodyField) {
-      this.attachBodyListener(bodyField);
+      this.attachBodyListeners(bodyField);
     }
 
     const newState: GmailDetectionState = {
       inCompose,
       activeField: active,
       bodyText,
+      caretText,
       elements: {
         to: toField,
         subject: subjectField,
@@ -85,15 +84,35 @@ export class GmailComposeDetector {
     }
   }
 
-  private attachBodyListener(bodyElement: HTMLElement): void {
-    // If listener already added → skip
-    if (this.inputListener) return;
+  private getCaretWord(body: HTMLElement | null): string {
+    if (!body) return "";
 
-    this.inputListener = () => {
-      this.evaluate(); // re-run detection on input
-    };
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return "";
 
-    bodyElement.addEventListener("input", this.inputListener);
+    const range = sel.getRangeAt(0);
+    const textBeforeCaret = range.startContainer.textContent ?? "";
+
+    const partial = textBeforeCaret
+      .slice(0, range.startOffset)
+      .split(/\s+/)
+      .pop();
+
+    return partial ?? "";
+  }
+
+  private attachBodyListeners(bodyElement: HTMLElement): void {
+    if (!this.inputListener) {
+      this.inputListener = () => this.evaluate();
+      bodyElement.addEventListener("input", this.inputListener);
+    }
+
+    if (!this.keyListener) {
+      this.keyListener = (e: KeyboardEvent) => {
+        this.onKeyEvent(e.key);
+      };
+      bodyElement.addEventListener("keydown", this.keyListener);
+    }
   }
 
   private statesEqual(
@@ -101,10 +120,12 @@ export class GmailComposeDetector {
     b: GmailDetectionState
   ): boolean {
     if (a === null) return false;
+
     return (
       a.inCompose === b.inCompose &&
       a.activeField === b.activeField &&
       a.bodyText === b.bodyText &&
+      a.caretText === b.caretText &&
       a.elements.to === b.elements.to &&
       a.elements.subject === b.elements.subject &&
       a.elements.body === b.elements.body
@@ -112,9 +133,6 @@ export class GmailComposeDetector {
   }
 
   public stop(): void {
-    if (this.observer) {
-      this.observer.disconnect();
-      this.observer = null;
-    }
+    if (this.observer) this.observer.disconnect();
   }
 }
