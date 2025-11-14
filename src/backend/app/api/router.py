@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from .endpoints import health, setup
+from .endpoints import health, setup, analyze
 
 api_router = APIRouter()
 
@@ -11,3 +11,4 @@ def root() -> JSONResponse:
 
 api_router.include_router(health.router, prefix="/health", tags=["Health"])
 api_router.include_router(setup.router, prefix="/setup", tags=["Setup"])
+api_router.include_router(analyze.router, prefix="/analyze", tags=["Analyzer"])
